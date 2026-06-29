@@ -25,9 +25,10 @@ class AQIDataUpdateCoordinator(DataUpdateCoordinator):
         self,
         hass: HomeAssistant,
         entry: ConfigEntry,
+        aqi_client: AQIClient,
     ) -> None:
         """Initialize."""
-        self._aqi_client: AQIClient | None = None
+        self._aqi_client = aqi_client
         self._slug = entry.data[CONF_SLUG]
 
         super().__init__(
@@ -37,17 +38,14 @@ class AQIDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=DEFAULT_UPDATE_INTERVAL),
         )
 
-    async def _async_setup(self) -> None:
-        """Set up the client."""
-        if self._aqi_client is None:
-            self._aqi_client = AQIClient()
+    @property
+    def slug(self) -> str:
+        """Return the configured location slug."""
+        return self._slug
 
     async def _async_update_data(self) -> object:
         """Fetch data from API endpoint."""
         try:
-            await self._async_setup()
-            assert self._aqi_client is not None
-
             location_data = await self._aqi_client.get_location_by_slug(slug=self._slug)
 
             if not location_data:

@@ -166,6 +166,12 @@ class AQIPollutantSensor(CoordinatorEntity, SensorEntity):
         self._attr_native_unit_of_measurement = unit_of_measurement
         self._attr_device_class = device_class
         self._attr_state_class = state_class
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, coordinator.slug)},
+            "name": coordinator.config_entry.title,
+            "manufacturer": "AQI.in",
+            "model": "Air Quality Station",
+        }
 
     @property
     def native_value(self) -> float | None:
@@ -272,6 +278,12 @@ class AQIWeatherSensor(CoordinatorEntity, SensorEntity):
         self._attr_native_unit_of_measurement = unit_of_measurement
         self._attr_device_class = device_class
         self._attr_state_class = state_class
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, coordinator.slug)},
+            "name": coordinator.config_entry.title,
+            "manufacturer": "AQI.in",
+            "model": "Air Quality Station",
+        }
 
     @property
     def native_value(self) -> float | None:
