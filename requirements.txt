@@ -1,0 +1,8 @@
+# This file is for development dependencies
+# Runtime dependencies are specified in manifest.json
+
+# For development
+pytest>=6.0
+pytest-cov>=2.0
+ruff>=0.0.200
+mypy>=0.900

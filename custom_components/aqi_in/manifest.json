@@ -1,0 +1,11 @@
+{
+  "domain": "aqi_in",
+  "name": "Air Quality India",
+  "documentation": "https://github.com/air-sviva/aqi-in-custom-component",
+  "requirements": ["aqi-in-api"],
+  "codeowners": ["@air-sviva"],
+  "issue_tracker": "https://github.com/air-sviva/aqi-in-custom-component/issues",
+  "license": "MIT License",
+  "version": "0.1.0",
+  "iot_class": "cloud_polling"
+}
