@@ -1,20 +1,4 @@
 {
-  "domain": "aqi_in",
   "name": "Air Quality India",
-  "documentation": "https://github.com/air-sviva/aqi-in-custom-component",
-  "issue_tracker": "https://github.com/air-sviva/aqi-in-custom-component/issues",
-  "version": "0.1.0",
-  "requirements": [
-    "aqi-in-api"
-  ],
-  "codeowners": [
-    "@air-sviva"
-  ],
-  "integrations": [
-    "aqi_in"
-  ],
-  "iot_class": "cloud_polling",
-  "config_flow": true,
-  "dependencies": [],
-  "integration_type": "sensor"
+  "render_readme": true
 }

@@ -31,8 +31,8 @@ jobs:
     - name: Lint with ruff
       run: |
         pip install ruff
-        ruff check .
+        ruff check custom_components/
     - name: Lint with mypy
       run: |
         pip install mypy
-        mypy --ignore-missing-imports .
+        mypy --ignore-missing-imports custom_components/

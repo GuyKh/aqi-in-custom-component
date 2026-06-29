@@ -1,5 +1,9 @@
 # Air Quality India (AQI.in) Integration for Home Assistant
 
+<p align="center">
+  <img src="custom_components/aqi_in/www/logo.png" alt="AQI.in Logo" width="200">
+</p>
+
 [![GitHub Release][releases-shield]][releases]
 [![GitHub Activity][commits-shield]][commits]
 [![License][license-shield]][license]
