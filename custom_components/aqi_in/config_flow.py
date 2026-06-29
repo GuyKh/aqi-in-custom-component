@@ -8,7 +8,13 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers import config_validation as cv
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.selector import (
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
 
 from aqi_in_api import AQIClient
 from .const import (
@@ -21,11 +27,53 @@ from .const import (
     SENSOR_TYPES,
 )
 
-# Steps:
-# 1. Select country
-# 2. Select state
-# 3. Select city
-# 4. Select sensors
+ALL_SENSORS = list(SENSOR_TYPES.keys())
+
+
+async def _get_aqi_client(hass: HomeAssistant) -> AQIClient:
+    """Create an AQIClient in an executor to avoid blocking the event loop."""
+    return await hass.async_add_executor_job(AQIClient)
+
+
+def _country_selector(countries: list[dict[str, str]]) -> SelectSelector:
+    """Build a dropdown selector for countries."""
+    return SelectSelector(
+        SelectSelectorConfig(
+            options=[
+                SelectOptionDict(value=c["code"], label=c["name"])
+                for c in countries
+            ],
+            mode=SelectSelectorMode.DROPDOWN,
+        )
+    )
+
+
+def _state_selector(states: list[dict[str, str]]) -> SelectSelector:
+    """Build a dropdown selector for states."""
+    return SelectSelector(
+        SelectSelectorConfig(
+            options=[
+                SelectOptionDict(value=s["code"], label=s["name"])
+                for s in states
+            ],
+            mode=SelectSelectorMode.DROPDOWN,
+        )
+    )
+
+
+def _city_selector(cities: list[dict[str, str]]) -> SelectSelector:
+    """Build a dropdown selector for cities."""
+    return SelectSelector(
+        SelectSelectorConfig(
+            options=[
+                SelectOptionDict(value=c["slug"], label=c["name"])
+                for c in cities
+            ],
+            mode=SelectSelectorMode.DROPDOWN,
+        )
+    )
+
+
 
 class AQIConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for aqi_in."""
@@ -38,6 +86,12 @@ class AQIConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._country: str | None = None
         self._state: str | None = None
         self._city: str | None = None
+
+    async def _ensure_client(self) -> AQIClient:
+        """Ensure we have an AQIClient, creating one in executor if needed."""
+        if self._aqi_client is None:
+            self._aqi_client = await _get_aqi_client(self.hass)
+        return self._aqi_client
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -56,16 +110,13 @@ class AQIConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_state()
 
         try:
-            if self._aqi_client is None:
-                self._aqi_client = AQIClient()
-            
-            countries = await self._aqi_client.get_countries()
+            client = await self._ensure_client()
+            countries = await client.get_countries()
         except Exception:
             errors["base"] = "cannot_fetch_countries"
             countries = []
 
         if not countries:
-            # Fallback to common countries if API fails
             countries = [
                 {"code": "IN", "name": "India"},
                 {"code": "US", "name": "United States"},
@@ -78,9 +129,7 @@ class AQIConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="country",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_COUNTRY): vol.In(
-                        {country["code"]: country["name"] for country in countries}
-                    )
+                    vol.Required(CONF_COUNTRY): _country_selector(countries),
                 }
             ),
             errors=errors,
@@ -97,16 +146,13 @@ class AQIConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_city()
 
         try:
-            if self._aqi_client is None:
-                self._aqi_client = AQIClient()
-            
-            states = await self._aqi_client.get_states(self._country)
+            client = await self._ensure_client()
+            states = await client.get_states(self._country)
         except Exception:
             errors["base"] = "cannot_fetch_states"
             states = []
 
         if not states:
-            # Fallback for common countries
             states_map = {
                 "IN": [
                     {"code": "DL", "name": "Delhi"},
@@ -127,9 +173,7 @@ class AQIConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="state",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_STATE): vol.In(
-                        {state["code"]: state["name"] for state in states}
-                    )
+                    vol.Required(CONF_STATE): _state_selector(states),
                 }
             ),
             errors=errors,
@@ -143,19 +187,26 @@ class AQIConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             self._city = user_input[CONF_CITY]
-            return await self.async_step_sensors()
+            return self.async_create_entry(
+                title=DEFAULT_NAME,
+                data={
+                    CONF_COUNTRY: self._country,
+                    CONF_STATE: self._state,
+                    CONF_CITY: self._city,
+                },
+                options={
+                    CONF_SENSORS: ALL_SENSORS,
+                },
+            )
 
         try:
-            if self._aqi_client is None:
-                self._aqi_client = AQIClient()
-            
-            cities = await self._aqi_client.get_cities(self._country, self._state)
+            client = await self._ensure_client()
+            cities = await client.get_cities(self._country, self._state)
         except Exception:
             errors["base"] = "cannot_fetch_cities"
             cities = []
 
         if not cities:
-            # Fallback for common cities
             cities_map = {
                 ("IN", "DL"): [
                     {"slug": "delhi", "name": "New Delhi"},
@@ -174,40 +225,7 @@ class AQIConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="city",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_CITY): vol.In(
-                        {city["slug"]: city["name"] for city in cities}
-                    )
-                }
-            ),
-            errors=errors,
-        )
-
-    async def async_step_sensors(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Handle the sensor selection step."""
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            return self.async_create_entry(
-                title=DEFAULT_NAME,
-                data={
-                    CONF_COUNTRY: self._country,
-                    CONF_STATE: self._state,
-                    CONF_CITY: self._city,
-                },
-                options={
-                    CONF_SENSORS: user_input[CONF_SENSORS],
-                },
-            )
-
-        return self.async_show_form(
-            step_id="sensors",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_SENSORS, default=list(SENSOR_TYPES.keys())
-                    ): cv.multi_select(SENSOR_TYPES)
+                    vol.Required(CONF_CITY): _city_selector(cities),
                 }
             ),
             errors=errors,
@@ -237,10 +255,8 @@ class AQIConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_reconfigure_state()
 
         try:
-            if self._aqi_client is None:
-                self._aqi_client = AQIClient()
-            
-            countries = await self._aqi_client.get_countries()
+            client = await self._ensure_client()
+            countries = await client.get_countries()
         except Exception:
             errors["base"] = "cannot_fetch_countries"
             countries = []
@@ -258,9 +274,7 @@ class AQIConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="reconfigure_country",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_COUNTRY): vol.In(
-                        {country["code"]: country["name"] for country in countries}
-                    )
+                    vol.Required(CONF_COUNTRY): _country_selector(countries),
                 }
             ),
             errors=errors,
@@ -277,10 +291,8 @@ class AQIConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_reconfigure_city()
 
         try:
-            if self._aqi_client is None:
-                self._aqi_client = AQIClient()
-            
-            states = await self._aqi_client.get_states(self._country)
+            client = await self._ensure_client()
+            states = await client.get_states(self._country)
         except Exception:
             errors["base"] = "cannot_fetch_states"
             states = []
@@ -306,9 +318,7 @@ class AQIConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="reconfigure_state",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_STATE): vol.In(
-                        {state["code"]: state["name"] for state in states}
-                    )
+                    vol.Required(CONF_STATE): _state_selector(states),
                 }
             ),
             errors=errors,
@@ -322,13 +332,21 @@ class AQIConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             self._city = user_input[CONF_CITY]
-            return await self.async_step_reconfigure_sensors()
+            return self.async_update_reload_and_abort(
+                self._get_reconfigure_entry(),
+                data_updates={
+                    CONF_COUNTRY: self._country,
+                    CONF_STATE: self._state,
+                    CONF_CITY: self._city,
+                },
+                options={
+                    CONF_SENSORS: ALL_SENSORS,
+                },
+            )
 
         try:
-            if self._aqi_client is None:
-                self._aqi_client = AQIClient()
-            
-            cities = await self._aqi_client.get_cities(self._country, self._state)
+            client = await self._ensure_client()
+            cities = await client.get_cities(self._country, self._state)
         except Exception:
             errors["base"] = "cannot_fetch_cities"
             cities = []
@@ -352,44 +370,9 @@ class AQIConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="reconfigure_city",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_CITY): vol.In(
-                        {city["slug"]: city["name"] for city in cities}
-                    )
+                    vol.Required(CONF_CITY): _city_selector(cities),
                 }
             ),
             errors=errors,
         )
 
-    async def async_step_reconfigure_sensors(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Handle reconfiguration sensor selection."""
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            return self.async_update_reload_and_abort(
-                self._get_reconfigure_entry(),
-                data_updates={
-                    CONF_COUNTRY: self._country,
-                    CONF_STATE: self._state,
-                    CONF_CITY: self._city,
-                },
-                options={
-                    CONF_SENSORS: user_input[CONF_SENSORS],
-                },
-            )
-
-        return self.async_show_form(
-            step_id="reconfigure_sensors",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_SENSORS, 
-                        default=self._get_reconfigure_entry().options.get(
-                            CONF_SENSORS, list(SENSOR_TYPES.keys())
-                        )
-                    ): cv.multi_select(SENSOR_TYPES)
-                }
-            ),
-            errors=errors,
-        )
