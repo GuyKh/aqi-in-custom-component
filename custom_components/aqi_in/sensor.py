@@ -22,8 +22,8 @@ from .const import (
     AQI_BREAKPOINTS,
     DEFAULT_NAME,
     DOMAIN,
-    SENSOR_TYPES,
 )
+from .coordinator import AQIDataUpdateCoordinator
 
 # Mapping of sensor types to their units and device classes
 SENSOR_TYPES_DETAILS = {
