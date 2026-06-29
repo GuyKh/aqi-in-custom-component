@@ -3,25 +3,11 @@
 DOMAIN = "aqi_in"
 
 # Configuration keys
-CONF_COUNTRY = "country"
-CONF_STATE = "state"
-CONF_CITY = "city"
-CONF_SENSORS = "sensors"
+CONF_SLUG = "slug"
 
 # Default values
-DEFAULT_NAME = "Air Quality India"
+DEFAULT_NAME = "AQI India"
 DEFAULT_UPDATE_INTERVAL = 600  # 10 minutes in seconds
-
-# Sensor types
-SENSOR_TYPES = {
-    "pm25": "PM 2.5",
-    "pm10": "PM 10",
-    "no2": "NO₂",
-    "so2": "SO₂",
-    "co": "CO",
-    "o3": "O₃",
-    "nh3": "NH₃",
-}
 
 # IAQI (Indian Air Quality Index) breakpoints
 # Based on CPCB guidelines

@@ -1,132 +1,31 @@
 {
   "config": {
     "step": {
-      "country": {
-        "title": "Select Country",
-        "description": "Select the country for air quality data",
+      "user": {
+        "title": "Select Location",
+        "description": "Choose a city for air quality monitoring. Closest cities are listed first based on your Home Assistant location.",
         "data": {
-          "country": "Country"
-        }
-      },
-      "state": {
-        "title": "Select State/Province",
-        "description": "Select the state or province for air quality data",
-        "data": {
-          "state": "State/Province"
-        }
-      },
-      "city": {
-        "title": "Select City",
-        "description": "Select the city for air quality data",
-        "data": {
-          "city": "City"
-        }
-      },
-      "sensors": {
-        "title": "Select Sensors",
-        "description": "Select which air quality sensors to monitor",
-        "data": {
-          "sensors": "Sensors"
+          "slug": "City"
         }
       }
     },
     "error": {
-      "cannot_fetch_countries": "Failed to fetch countries from API",
-      "cannot_fetch_states": "Failed to fetch states from API",
-      "cannot_fetch_cities": "Failed to fetch cities from API",
-      "unknown": "An unexpected error occurred"
-    }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "AQI.in Options",
-        "description": "Configure AQI.in integration options",
-        "data": {
-          "sensors": "Sensors to Monitor"
-        }
-      }
+      "cannot_connect": "Failed to connect to the AQI.in API"
     }
   },
   "entity": {
     "sensor": {
-      "pm25": {
-        "name": "PM 2.5",
-        "state": {
-          "good": "Good",
-          "moderate": "Moderate",
-          "unhealthy_sensitive": "Unhealthy for Sensitive Groups",
-          "unhealthy": "Unhealthy",
-          "very_unhealthy": "Very Unhealthy",
-          "hazardous": "Hazardous"
-        }
-      },
-      "pm10": {
-        "name": "PM 10",
-        "state": {
-          "good": "Good",
-          "moderate": "Moderate",
-          "unhealthy_sensitive": "Unhealthy for Sensitive Groups",
-          "unhealthy": "Unhealthy",
-          "very_unhealthy": "Very Unhealthy",
-          "hazardous": "Hazardous"
-        }
-      },
-      "no2": {
-        "name": "Nitrogen Dioxide (NO₂)",
-        "state": {
-          "good": "Good",
-          "moderate": "Moderate",
-          "unhealthy_sensitive": "Unhealthy for Sensitive Groups",
-          "unhealthy": "Unhealthy",
-          "very_unhealthy": "Very Unhealthy",
-          "hazardous": "Hazardous"
-        }
-      },
-      "so2": {
-        "name": "Sulfur Dioxide (SO₂)",
-        "state": {
-          "good": "Good",
-          "moderate": "Moderate",
-          "unhealthy_sensitive": "Unhealthy for Sensitive Groups",
-          "unhealthy": "Unhealthy",
-          "very_unhealthy": "Very Unhealthy",
-          "hazardous": "Hazardous"
-        }
-      },
-      "co": {
-        "name": "Carbon Monoxide (CO)",
-        "state": {
-          "good": "Good",
-          "moderate": "Moderate",
-          "unhealthy_sensitive": "Unhealthy for Sensitive Groups",
-          "unhealthy": "Unhealthy",
-          "very_unhealthy": "Very Unhealthy",
-          "hazardous": "Hazardous"
-        }
-      },
-      "o3": {
-        "name": "Ozone (O₃)",
-        "state": {
-          "good": "Good",
-          "moderate": "Moderate",
-          "unhealthy_sensitive": "Unhealthy for Sensitive Groups",
-          "unhealthy": "Unhealthy",
-          "very_unhealthy": "Very Unhealthy",
-          "hazardous": "Hazardous"
-        }
-      },
-      "nh3": {
-        "name": "Ammonia (NH₃)",
-        "state": {
-          "good": "Good",
-          "moderate": "Moderate",
-          "unhealthy_sensitive": "Unhealthy for Sensitive Groups",
-          "unhealthy": "Unhealthy",
-          "very_unhealthy": "Very Unhealthy",
-          "hazardous": "Hazardous"
-        }
-      }
+      "pm25": { "name": "PM 2.5" },
+      "pm10": { "name": "PM 10" },
+      "no2": { "name": "NO₂" },
+      "so2": { "name": "SO₂" },
+      "co": { "name": "CO" },
+      "o3": { "name": "O₃" },
+      "aqi": { "name": "AQI" },
+      "temperature": { "name": "Temperature" },
+      "humidity": { "name": "Humidity" },
+      "wind_speed": { "name": "Wind Speed" },
+      "pressure": { "name": "Pressure" }
     }
   }
 }

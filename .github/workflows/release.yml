@@ -1,0 +1,69 @@
+name: "Release"
+
+on:
+  release:
+    types:
+      - "published"
+
+permissions:
+  contents: write
+
+jobs:
+  lint:
+    name: "Ruff"
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: "Checkout the repository"
+        uses: "actions/checkout@v7.0.0"
+
+      - name: "Run Ruff linting"
+        run: pipx run ruff check .
+
+      - name: "Run Ruff formatting check"
+        run: pipx run ruff format . --check
+
+  typecheck:
+    name: "MyPy"
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: "Checkout the repository"
+        uses: "actions/checkout@v7.0.0"
+
+      - name: "Run MyPy type checking"
+        run: pipx run mypy .
+
+  release:
+    name: "Release"
+    runs-on: "ubuntu-latest"
+    needs: [lint, typecheck]
+    steps:
+      - name: "Checkout the repository"
+        uses: "actions/checkout@v7"
+
+      - name: "Prepare release package"
+        shell: "bash"
+        run: |
+          mkdir -p release
+          cp -r custom_components/aqi_in release/
+
+      - name: "Create ZIP archive"
+        shell: "bash"
+        run: |
+          cd release
+          zip aqi-in-custom-component.zip -r .
+
+      - name: "Upload release artifact"
+        uses: "softprops/action-gh-release@v3"
+        with:
+          name: "AQI.in Custom Component"
+          files: "release/aqi-in-custom-component.zip"
+          body: |
+            A Home Assistant custom component for air quality monitoring.
+            Fetches data from AQI.in using the aqi-in-api package.
+
+            Features:
+            - Config flow with country/state/city selection
+            - IAQI pollutant sensors (AQI, PM2.5, PM10, O3, NO2, SO2, CO)
+            - Weather data sensors (temperature, humidity, wind)
+            - English and Hebrew translations
+            - 10-minute auto-refresh polling

@@ -18,56 +18,89 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
-from .const import (
-    IAQI_BREAKPOINTS,
-    DEFAULT_NAME,
-    DOMAIN,
-)
+from .const import IAQI_BREAKPOINTS, DEFAULT_NAME, DOMAIN
 from .coordinator import AQIDataUpdateCoordinator
 
-# Mapping of sensor types to their units and device classes
-SENSOR_TYPES_DETAILS = {
+IAQI_SENSORS: dict[str, dict[str, Any]] = {
     "pm25": {
         "name": "PM 2.5",
         "unit": CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
         "device_class": SensorDeviceClass.PM25,
         "state_class": SensorStateClass.MEASUREMENT,
+        "iaqi_key": "pm25",
     },
     "pm10": {
         "name": "PM 10",
         "unit": CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
         "device_class": SensorDeviceClass.PM10,
         "state_class": SensorStateClass.MEASUREMENT,
+        "iaqi_key": "pm10",
     },
     "no2": {
         "name": "NO₂",
         "unit": CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
         "device_class": SensorDeviceClass.NITROGEN_DIOXIDE,
         "state_class": SensorStateClass.MEASUREMENT,
+        "iaqi_key": "no2",
     },
     "so2": {
         "name": "SO₂",
         "unit": CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
         "device_class": SensorDeviceClass.SULPHUR_DIOXIDE,
         "state_class": SensorStateClass.MEASUREMENT,
+        "iaqi_key": "so2",
     },
     "co": {
         "name": "CO",
         "unit": CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
         "device_class": SensorDeviceClass.CARBON_MONOXIDE,
         "state_class": SensorStateClass.MEASUREMENT,
+        "iaqi_key": "co",
     },
     "o3": {
         "name": "O₃",
         "unit": CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
         "device_class": SensorDeviceClass.OZONE,
         "state_class": SensorStateClass.MEASUREMENT,
+        "iaqi_key": "o3",
     },
-    "nh3": {
-        "name": "NH₃",
-        "unit": CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
-        "device_class": SensorDeviceClass.AMMONIA,
+    "aqi": {
+        "name": "AQI",
+        "unit": None,
+        "device_class": SensorDeviceClass.AQI,
         "state_class": SensorStateClass.MEASUREMENT,
+        "iaqi_key": "aqi",
+    },
+}
+
+WEATHER_SENSORS: dict[str, dict[str, Any]] = {
+    "temperature": {
+        "name": "Temperature",
+        "unit": "°C",
+        "device_class": SensorDeviceClass.TEMPERATURE,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "weather_key": "temp_c",
+    },
+    "humidity": {
+        "name": "Humidity",
+        "unit": "%",
+        "device_class": SensorDeviceClass.HUMIDITY,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "weather_key": "humidity",
+    },
+    "wind_speed": {
+        "name": "Wind Speed",
+        "unit": "km/h",
+        "device_class": SensorDeviceClass.WIND_SPEED,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "weather_key": "wind_kph",
+    },
+    "pressure": {
+        "name": "Pressure",
+        "unit": "hPa",
+        "device_class": SensorDeviceClass.ATMOSPHERIC_PRESSURE,
+        "state_class": SensorStateClass.MEASUREMENT,
+        "weather_key": "pressure_mb",
     },
 }
 
@@ -80,38 +113,54 @@ async def async_setup_entry(
     """Set up the sensor platform."""
     coordinator: AQIDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    entities = []
-    for sensor_type in coordinator.selected_sensors:
-        if sensor_type in SENSOR_TYPES_DETAILS:
-            entities.append(
-                AQISensor(
-                    coordinator,
-                    sensor_type,
-                    SENSOR_TYPES_DETAILS[sensor_type]["name"],
-                    SENSOR_TYPES_DETAILS[sensor_type]["unit"],
-                    SENSOR_TYPES_DETAILS[sensor_type]["device_class"],
-                    SENSOR_TYPES_DETAILS[sensor_type]["state_class"],
-                )
+    entities: list[SensorEntity] = []
+
+    for sensor_type, config in IAQI_SENSORS.items():
+        entities.append(
+            AQIPollutantSensor(
+                coordinator,
+                sensor_type,
+                config["name"],
+                config["unit"],
+                config["device_class"],
+                config["state_class"],
+                config["iaqi_key"],
             )
+        )
+
+    for sensor_type, config in WEATHER_SENSORS.items():
+        entities.append(
+            AQIWeatherSensor(
+                coordinator,
+                sensor_type,
+                config["name"],
+                config["unit"],
+                config["device_class"],
+                config["state_class"],
+                config["weather_key"],
+            )
+        )
 
     async_add_entities(entities)
 
 
-class AQISensor(CoordinatorEntity, SensorEntity):
-    """Representation of an AQI sensor."""
+class AQIPollutantSensor(CoordinatorEntity, SensorEntity):
+    """Representation of an IAQI pollutant sensor."""
 
     def __init__(
         self,
         coordinator: DataUpdateCoordinator,
         sensor_type: str,
         name: str,
-        unit_of_measurement: str,
+        unit_of_measurement: str | None,
         device_class: SensorDeviceClass,
         state_class: SensorStateClass,
+        iaqi_key: str,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._sensor_type = sensor_type
+        self._iaqi_key = iaqi_key
         self._attr_name = f"{DEFAULT_NAME} {name}"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_{sensor_type}"
         self._attr_native_unit_of_measurement = unit_of_measurement
@@ -123,12 +172,16 @@ class AQISensor(CoordinatorEntity, SensorEntity):
         """Return the state of the sensor."""
         if self.coordinator.data is None:
             return None
-            
-        # Get the raw value from the data
-        value = self.coordinator.data.get(self._sensor_type)
+        data_list = self.coordinator.data
+        if not data_list:
+            return None
+        location = data_list[0]
+        iaqi = getattr(location, "iaqi", None)
+        if not isinstance(iaqi, dict):
+            return None
+        value = iaqi.get(self._iaqi_key)
         if value is None:
             return None
-            
         return round(float(value), 1)
 
     @property
@@ -137,44 +190,51 @@ class AQISensor(CoordinatorEntity, SensorEntity):
         if self.coordinator.data is None:
             return None
 
+        data_list = self.coordinator.data
+        if not data_list:
+            return None
+        location = data_list[0]
         attrs: dict[str, Any] = {}
-        
-        # Add AQI information if available
-        if self._sensor_type in IAQI_BREAKPOINTS and self.coordinator.data.get(self._sensor_type) is not None:
-            try:
-                value = float(self.coordinator.data.get(self._sensor_type, 0))
-                aqi = self._calculate_aqi(value, self._sensor_type)
-                attrs["aqi"] = round(aqi)
-                attrs["aqi_category"] = self._get_aqi_category(aqi)
-            except (ValueError, TypeError):
-                pass
-        
-        # Add timestamp if available
-        if "last_updated" in self.coordinator.data:
-            attrs["last_updated"] = self.coordinator.data["last_updated"]
-            
+
+        if self._sensor_type != "aqi" and self._sensor_type in IAQI_BREAKPOINTS:
+            iaqi = getattr(location, "iaqi", {})
+            if isinstance(iaqi, dict) and self._iaqi_key in iaqi:
+                try:
+                    value = float(iaqi[self._iaqi_key])
+                    aqi = self._calculate_aqi(value, self._sensor_type)
+                    attrs["aqi"] = round(aqi)
+                    attrs["aqi_category"] = self._get_aqi_category(aqi)
+                except (ValueError, TypeError):
+                    pass
+
+        updated_at = getattr(location, "updated_at", None) or getattr(
+            location, "updatedAt", None
+        )
+        if updated_at:
+            attrs["last_updated"] = updated_at
+
         return attrs
 
     def _calculate_aqi(self, value: float, pollutant: str) -> float:
         """Calculate AQI based on pollutant concentration."""
         if pollutant not in IAQI_BREAKPOINTS:
             return 0.0
-            
+
         breakpoints = IAQI_BREAKPOINTS[pollutant]
-        
-        # Find the appropriate breakpoint range
+
         for bp_low, bp_high, aqi_low, aqi_high in breakpoints:
             if bp_low <= value <= bp_high:
-                # Linear interpolation
-                return ((aqi_high - aqi_low) / (bp_high - bp_low)) * (value - bp_low) + aqi_low
-        
-        # If value is above the highest breakpoint, return the maximum AQI
+                return ((aqi_high - aqi_low) / (bp_high - bp_low)) * (
+                    value - bp_low
+                ) + aqi_low
+
         if breakpoints:
-            return breakpoints[-1][3]  # Return the highest AQI value
-        
+            return breakpoints[-1][3]
+
         return 0.0
 
-    def _get_aqi_category(self, aqi: float) -> str:
+    @staticmethod
+    def _get_aqi_category(aqi: float) -> str:
         """Get AQI category description."""
         if aqi <= 50:
             return "Good"
@@ -188,3 +248,61 @@ class AQISensor(CoordinatorEntity, SensorEntity):
             return "Very poor"
         else:
             return "Severe"
+
+
+class AQIWeatherSensor(CoordinatorEntity, SensorEntity):
+    """Representation of a weather sensor from AQI.in location data."""
+
+    def __init__(
+        self,
+        coordinator: DataUpdateCoordinator,
+        sensor_type: str,
+        name: str,
+        unit_of_measurement: str | None,
+        device_class: SensorDeviceClass,
+        state_class: SensorStateClass,
+        weather_key: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self._sensor_type = sensor_type
+        self._weather_key = weather_key
+        self._attr_name = f"{DEFAULT_NAME} {name}"
+        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_{sensor_type}"
+        self._attr_native_unit_of_measurement = unit_of_measurement
+        self._attr_device_class = device_class
+        self._attr_state_class = state_class
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the state of the sensor."""
+        if self.coordinator.data is None:
+            return None
+        data_list = self.coordinator.data
+        if not data_list:
+            return None
+        location = data_list[0]
+        weather = getattr(location, "weather", None)
+        if not isinstance(weather, dict):
+            return None
+        value = weather.get(self._weather_key)
+        if value is None:
+            return None
+        return round(float(value), 1)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return the state attributes."""
+        if self.coordinator.data is None:
+            return None
+        data_list = self.coordinator.data
+        if not data_list:
+            return None
+        location = data_list[0]
+        attrs: dict[str, Any] = {}
+        updated_at = getattr(location, "updated_at", None) or getattr(
+            location, "updatedAt", None
+        )
+        if updated_at:
+            attrs["last_updated"] = updated_at
+        return attrs

@@ -1,6 +1,6 @@
 {
   "domain": "aqi_in",
-  "name": "Air Quality India",
+  "name": "AQI India",
   "codeowners": ["@guykh"],
   "config_flow": true,
   "documentation": "https://github.com/GuyKh/aqi-in-custom-component",

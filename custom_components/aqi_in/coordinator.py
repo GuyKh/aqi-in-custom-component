@@ -13,7 +13,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from aqi_in_api import AQIClient
-from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN
+from .const import CONF_SLUG, DEFAULT_UPDATE_INTERVAL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,10 +28,7 @@ class AQIDataUpdateCoordinator(DataUpdateCoordinator):
     ) -> None:
         """Initialize."""
         self._aqi_client: AQIClient | None = None
-        self._country = entry.data["country"]
-        self._state = entry.data["state"]
-        self._city = entry.data["city"]
-        self.selected_sensors = entry.options.get("sensors", [])
+        self._slug = entry.data[CONF_SLUG]
 
         super().__init__(
             hass,
@@ -45,18 +42,17 @@ class AQIDataUpdateCoordinator(DataUpdateCoordinator):
         if self._aqi_client is None:
             self._aqi_client = AQIClient()
 
-    async def _async_update_data(self):
+    async def _async_update_data(self) -> object:
         """Fetch data from API endpoint."""
         try:
             await self._async_setup()
             assert self._aqi_client is not None
-            
-            # Get location data using the stored city slug
-            location_data = await self._aqi_client.get_location_by_slug(self._city)
-            
+
+            location_data = await self._aqi_client.get_location_by_slug(slug=self._slug)
+
             if not location_data:
                 raise UpdateFailed("No data available from API")
-                
+
             return location_data
         except Exception as err:
             raise UpdateFailed(f"Error communicating with API: {err}") from err

@@ -1,132 +1,31 @@
 {
   "config": {
     "step": {
-      "country": {
-        "title": "בחירת מדינה",
-        "description": "בחר את המדינה לנתוני איכות אוויר",
+      "user": {
+        "title": "בחירת מיקום",
+        "description": "בחר עיר לניטור איכות אוויר. הערים הקרובות ביותר מוצגות ראשונות לפי מיקום ה-Home Assistant שלך.",
         "data": {
-          "country": "מדינה"
-        }
-      },
-      "state": {
-        "title": "בחירת מדינה/מחוז",
-        "description": "בחר את המדינה או המחוז לנתוני איכות אוויר",
-        "data": {
-          "state": "מדינה/מחוז"
-        }
-      },
-      "city": {
-        "title": "בחירת עיר",
-        "description": "בחר את העיר לנתוני איכות אוויר",
-        "data": {
-          "city": "עיר"
-        }
-      },
-      "sensors": {
-        "title": "בחירת חיישנים",
-        "description": "בחר אילו חיישני איכות אוויר לנטר",
-        "data": {
-          "sensors": "חיישנים"
+          "slug": "עיר"
         }
       }
     },
     "error": {
-      "cannot_fetch_countries": "לא ניתן לקבל מדינות מה-API",
-      "cannot_fetch_states": "לא ניתן לקבל מדינות/מחוזות מה-API",
-      "cannot_fetch_cities": "לא ניתן לקבל ערים מה-API",
-      "unknown": "אירעה שגיאה בלתי צפויה"
-    }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "אפשרויות AQI.in",
-        "description": "הגדר את אפשרויות אינטגרציית AQI.in",
-        "data": {
-          "sensors": "חיישנים למעקב"
-        }
-      }
+      "cannot_connect": "התחברות ל-API של AQI.in נכשלה"
     }
   },
   "entity": {
     "sensor": {
-      "pm25": {
-        "name": "חלקיקים עדינים PM 2.5",
-        "state": {
-          "good": "טוב",
-          "moderate": "בינוני",
-          "unhealthy_sensitive": "לא בריא לקבוצות רגישות",
-          "unhealthy": "לא בריא",
-          "very_unhealthy": "מאוד לא בריא",
-          "hazardous": "מסוכן"
-        }
-      },
-      "pm10": {
-        "name": "חלקיקים נשימים PM 10",
-        "state": {
-          "good": "טוב",
-          "moderate": "בינוני",
-          "unhealthy_sensitive": "לא בריא לקבוצות רגישות",
-          "unhealthy": "לא בריא",
-          "very_unhealthy": "מאוד לא בריא",
-          "hazardous": "מסוכן"
-        }
-      },
-      "no2": {
-        "name": "דיאוקסיד חנקן (NO₂)",
-        "state": {
-          "good": "טוב",
-          "moderate": "בינוני",
-          "unhealthy_sensitive": "לא בריא לקבוצות רגישות",
-          "unhealthy": "לא בריא",
-          "very_unhealthy": "מאוד לא בריא",
-          "hazardous": "מסוכן"
-        }
-      },
-      "so2": {
-        "name": "דיאוקסיד גופרית (SO₂)",
-        "state": {
-          "good": "טוב",
-          "moderate": "בינוני",
-          "unhealthy_sensitive": "לא בריא לקבוצות רגישות",
-          "unhealthy": "לא בריא",
-          "very_unhealthy": "מאוד לא בריא",
-          "hazardous": "מסוכן"
-        }
-      },
-      "co": {
-        "name": "מונוקסיד פחמן (CO)",
-        "state": {
-          "good": "טוב",
-          "moderate": "בינוני",
-          "unhealthy_sensitive": "לא בריא לקבוצות רגישות",
-          "unhealthy": "לא בריא",
-          "very_unhealthy": "מאוד לא בריא",
-          "hazardous": "מסוכן"
-        }
-      },
-      "o3": {
-        "name": "אוזון (O₃)",
-        "state": {
-          "good": "טוב",
-          "moderate": "בינוני",
-          "unhealthy_sensitive": "לא בריא לקבוצות רגישות",
-          "unhealthy": "לא בריא",
-          "very_unhealthy": "מאוד לא בריא",
-          "hazardous": "מסוכן"
-        }
-      },
-      "nh3": {
-        "name": "אמוניה (NH₃)",
-        "state": {
-          "good": "טוב",
-          "moderate": "בינוני",
-          "unhealthy_sensitive": "לא בריא לקבוצות רגישות",
-          "unhealthy": "לא בריא",
-          "very_unhealthy": "מאוד לא בריא",
-          "hazardous": "מסוכן"
-        }
-      }
+      "pm25": { "name": "PM 2.5" },
+      "pm10": { "name": "PM 10" },
+      "no2": { "name": "NO₂" },
+      "so2": { "name": "SO₂" },
+      "co": { "name": "CO" },
+      "o3": { "name": "O₃" },
+      "aqi": { "name": "AQI" },
+      "temperature": { "name": "טמפרטורה" },
+      "humidity": { "name": "לחות" },
+      "wind_speed": { "name": "מהירות רוח" },
+      "pressure": { "name": "לחץ" }
     }
   }
 }

@@ -105,6 +105,9 @@ venv.bak/
 
 # Miscellaneous
 /covers
-^
-*~token-optimizer/
+
+# Token optimizer session data
+token-optimizer/
+
+# Brand logo source
 output.png

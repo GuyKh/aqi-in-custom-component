@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import logging
+import math
 from typing import Any
 
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.core import HomeAssistant
+from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.selector import (
     SelectOptionDict,
     SelectSelector,
@@ -17,215 +19,115 @@ from homeassistant.helpers.selector import (
 )
 
 from aqi_in_api import AQIClient
-from .const import (
-    CONF_COUNTRY,
-    CONF_CITY,
-    CONF_STATE,
-    CONF_SENSORS,
-    DEFAULT_NAME,
-    DOMAIN,
-    SENSOR_TYPES,
-)
+from .const import CONF_SLUG, DOMAIN
 
-ALL_SENSORS = list(SENSOR_TYPES.keys())
+_LOGGER = logging.getLogger(__name__)
+
+ALL_LOCATIONS_URL = "https://apiserver.aqi.in/aqi/getAllMapLocations"
+ALL_LOCATIONS_PARAMS: dict[str, str] = {"sensorname": "aqi", "source": "web"}
 
 
-async def _get_aqi_client(hass: HomeAssistant) -> AQIClient:
-    """Create an AQIClient in an executor to avoid blocking the event loop."""
-    return await hass.async_add_executor_job(AQIClient)
+def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Return distance in km between two lat/lon points."""
 
-
-def _country_selector(countries: list[dict[str, str]]) -> SelectSelector:
-    """Build a dropdown selector for countries."""
-    return SelectSelector(
-        SelectSelectorConfig(
-            options=[
-                SelectOptionDict(value=c["code"], label=c["name"])
-                for c in countries
-            ],
-            mode=SelectSelectorMode.DROPDOWN,
-        )
+    R = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(math.radians(lat1))
+        * math.cos(math.radians(lat2))
+        * math.sin(dlon / 2) ** 2
     )
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
-def _state_selector(states: list[dict[str, str]]) -> SelectSelector:
-    """Build a dropdown selector for states."""
-    return SelectSelector(
-        SelectSelectorConfig(
-            options=[
-                SelectOptionDict(value=s["code"], label=s["name"])
-                for s in states
-            ],
-            mode=SelectSelectorMode.DROPDOWN,
+def _slug_to_label(slug: str) -> str:
+    """Convert 'india/maharashtra/mumbai' to 'Mumbai, Maharashtra, India'."""
+    parts = slug.split("/")
+    if len(parts) >= 3:
+        return "{}, {}, {}".format(
+            parts[2].replace("-", " ").title(),
+            parts[1].replace("-", " ").title(),
+            parts[0].replace("-", " ").title(),
         )
-    )
+    return slug.replace("-", " ").title()
 
 
-def _city_selector(cities: list[dict[str, str]]) -> SelectSelector:
-    """Build a dropdown selector for cities."""
-    return SelectSelector(
-        SelectSelectorConfig(
-            options=[
-                SelectOptionDict(value=c["slug"], label=c["name"])
-                for c in cities
-            ],
-            mode=SelectSelectorMode.DROPDOWN,
+async def _fetch_nearby_cities(
+    hass: HomeAssistant,
+) -> list[tuple[str, str]]:
+    """Fetch all map locations and return top 50 nearest city slugs sorted by distance."""
+    ha_lat: float = hass.config.latitude or 20.0
+    ha_lon: float = hass.config.longitude or 77.0
+
+    client = AQIClient()
+    try:
+        token = await client._get_token()
+        resp = await client._http.get(
+            ALL_LOCATIONS_URL,
+            params=ALL_LOCATIONS_PARAMS,
+            headers={"authorization": f"bearer {token}"},
         )
-    )
+        resp.raise_for_status()
+        locations: list[dict[str, Any]] = resp.json().get("Locations", [])
+    finally:
+        await client.close()
+
+    city_map: dict[str, dict[str, Any]] = {}
+    for loc in locations:
+        slug: str = loc.get("slug", "")
+        parts = slug.split("/")
+        if len(parts) < 3:
+            continue
+        city_slug = "/".join(parts[:3])
+        dist = _haversine(ha_lat, ha_lon, loc.get("lat", 0), loc.get("lon", 0))
+        entry = city_map.get(city_slug)
+        if entry is None or dist < entry["_dist"]:
+            city_map[city_slug] = {"slug": city_slug, "_dist": dist}
+
+    sorted_cities = sorted(city_map.values(), key=lambda c: c["_dist"])
+    return [(c["slug"], _slug_to_label(c["slug"])) for c in sorted_cities[:50]]
 
 
-
-class AQIConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for aqi_in."""
-
+class AQIConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     VERSION = 1
-
-    def __init__(self) -> None:
-        """Initialize the config flow."""
-        self._aqi_client: AQIClient | None = None
-        self._country: str | None = None
-        self._state: str | None = None
-        self._city: str | None = None
-
-    async def _ensure_client(self) -> AQIClient:
-        """Ensure we have an AQIClient, creating one in executor if needed."""
-        if self._aqi_client is None:
-            self._aqi_client = await _get_aqi_client(self.hass)
-        return self._aqi_client
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle the initial step."""
-        return await self.async_step_country()
-
-    async def async_step_country(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Handle the country selection step."""
-        errors: dict[str, str] = {}
-
         if user_input is not None:
-            self._country = user_input[CONF_COUNTRY]
-            return await self.async_step_state()
-
-        try:
-            client = await self._ensure_client()
-            countries = await client.get_countries()
-        except Exception:
-            errors["base"] = "cannot_fetch_countries"
-            countries = []
-
-        if not countries:
-            countries = [
-                {"code": "IN", "name": "India"},
-                {"code": "US", "name": "United States"},
-                {"code": "GB", "name": "United Kingdom"},
-                {"code": "CA", "name": "Canada"},
-                {"code": "AU", "name": "Australia"},
-            ]
-
-        return self.async_show_form(
-            step_id="country",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_COUNTRY): _country_selector(countries),
-                }
-            ),
-            errors=errors,
-        )
-
-    async def async_step_state(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Handle the state selection step."""
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            self._state = user_input[CONF_STATE]
-            return await self.async_step_city()
-
-        try:
-            client = await self._ensure_client()
-            states = await client.get_states(self._country)
-        except Exception:
-            errors["base"] = "cannot_fetch_states"
-            states = []
-
-        if not states:
-            states_map = {
-                "IN": [
-                    {"code": "DL", "name": "Delhi"},
-                    {"code": "MH", "name": "Maharashtra"},
-                    {"code": "KA", "name": "Karnataka"},
-                    {"code": "TN", "name": "Tamil Nadu"},
-                ],
-                "US": [
-                    {"code": "CA", "name": "California"},
-                    {"code": "TX", "name": "Texas"},
-                    {"code": "NY", "name": "New York"},
-                    {"code": "FL", "name": "Florida"},
-                ],
-            }
-            states = states_map.get(self._country, [])
-
-        return self.async_show_form(
-            step_id="state",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_STATE): _state_selector(states),
-                }
-            ),
-            errors=errors,
-        )
-
-    async def async_step_city(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Handle the city selection step."""
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            self._city = user_input[CONF_CITY]
+            slug: str = user_input[CONF_SLUG]
+            label = _slug_to_label(slug)
+            await self.async_set_unique_id(slug)
+            self._abort_if_unique_id_configured()
             return self.async_create_entry(
-                title=DEFAULT_NAME,
-                data={
-                    CONF_COUNTRY: self._country,
-                    CONF_STATE: self._state,
-                    CONF_CITY: self._city,
-                },
-                options={
-                    CONF_SENSORS: ALL_SENSORS,
-                },
+                title=label,
+                data={CONF_SLUG: slug},
             )
 
-        try:
-            client = await self._ensure_client()
-            cities = await client.get_cities(self._country, self._state)
-        except Exception:
-            errors["base"] = "cannot_fetch_cities"
-            cities = []
+        errors: dict[str, str] = {}
+        options: list[SelectOptionDict] = []
 
-        if not cities:
-            cities_map = {
-                ("IN", "DL"): [
-                    {"slug": "delhi", "name": "New Delhi"},
-                    {"slug": "noida", "name": "Noida"},
-                    {"slug": "gurugram", "name": "Gurugram"},
-                ],
-                ("IN", "MH"): [
-                    {"slug": "mumbai", "name": "Mumbai"},
-                    {"slug": "pune", "name": "Pune"},
-                    {"slug": "nagpur", "name": "Nagpur"},
-                ],
-            }
-            cities = cities_map.get((self._country, self._state), [])
+        try:
+            nearby = await _fetch_nearby_cities(self.hass)
+            options = [
+                SelectOptionDict(value=slug, label=label) for slug, label in nearby
+            ]
+        except Exception:
+            _LOGGER.exception("Failed to fetch nearby cities")
+            errors["base"] = "cannot_connect"
 
         return self.async_show_form(
-            step_id="city",
+            step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_CITY): _city_selector(cities),
+                    vol.Required(CONF_SLUG): SelectSelector(
+                        SelectSelectorConfig(
+                            options=options,
+                            mode=SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
                 }
             ),
             errors=errors,
@@ -234,145 +136,4 @@ class AQIConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle reconfiguration of the integration."""
-        return await self.async_step_reconfigure_init()
-
-    async def async_step_reconfigure_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Handle reconfiguration initialization."""
-        self._set_confirm_only()
-        return await self.async_step_reconfigure_country()
-
-    async def async_step_reconfigure_country(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Handle reconfiguration country selection."""
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            self._country = user_input[CONF_COUNTRY]
-            return await self.async_step_reconfigure_state()
-
-        try:
-            client = await self._ensure_client()
-            countries = await client.get_countries()
-        except Exception:
-            errors["base"] = "cannot_fetch_countries"
-            countries = []
-
-        if not countries:
-            countries = [
-                {"code": "IN", "name": "India"},
-                {"code": "US", "name": "United States"},
-                {"code": "GB", "name": "United Kingdom"},
-                {"code": "CA", "name": "Canada"},
-                {"code": "AU", "name": "Australia"},
-            ]
-
-        return self.async_show_form(
-            step_id="reconfigure_country",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_COUNTRY): _country_selector(countries),
-                }
-            ),
-            errors=errors,
-        )
-
-    async def async_step_reconfigure_state(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Handle reconfiguration state selection."""
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            self._state = user_input[CONF_STATE]
-            return await self.async_step_reconfigure_city()
-
-        try:
-            client = await self._ensure_client()
-            states = await client.get_states(self._country)
-        except Exception:
-            errors["base"] = "cannot_fetch_states"
-            states = []
-
-        if not states:
-            states_map = {
-                "IN": [
-                    {"code": "DL", "name": "Delhi"},
-                    {"code": "MH", "name": "Maharashtra"},
-                    {"code": "KA", "name": "Karnataka"},
-                    {"code": "TN", "name": "Tamil Nadu"},
-                ],
-                "US": [
-                    {"code": "CA", "name": "California"},
-                    {"code": "TX", "name": "Texas"},
-                    {"code": "NY", "name": "New York"},
-                    {"code": "FL", "name": "Florida"},
-                ],
-            }
-            states = states_map.get(self._country, [])
-
-        return self.async_show_form(
-            step_id="reconfigure_state",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_STATE): _state_selector(states),
-                }
-            ),
-            errors=errors,
-        )
-
-    async def async_step_reconfigure_city(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Handle reconfiguration city selection."""
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            self._city = user_input[CONF_CITY]
-            return self.async_update_reload_and_abort(
-                self._get_reconfigure_entry(),
-                data_updates={
-                    CONF_COUNTRY: self._country,
-                    CONF_STATE: self._state,
-                    CONF_CITY: self._city,
-                },
-                options={
-                    CONF_SENSORS: ALL_SENSORS,
-                },
-            )
-
-        try:
-            client = await self._ensure_client()
-            cities = await client.get_cities(self._country, self._state)
-        except Exception:
-            errors["base"] = "cannot_fetch_cities"
-            cities = []
-
-        if not cities:
-            cities_map = {
-                ("IN", "DL"): [
-                    {"slug": "delhi", "name": "New Delhi"},
-                    {"slug": "noida", "name": "Noida"},
-                    {"slug": "gurugram", "name": "Gurugram"},
-                ],
-                ("IN", "MH"): [
-                    {"slug": "mumbai", "name": "Mumbai"},
-                    {"slug": "pune", "name": "Pune"},
-                    {"slug": "nagpur", "name": "Nagpur"},
-                ],
-            }
-            cities = cities_map.get((self._country, self._state), [])
-
-        return self.async_show_form(
-            step_id="reconfigure_city",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_CITY): _city_selector(cities),
-                }
-            ),
-            errors=errors,
-        )
-
+        return await self.async_step_user(user_input)
