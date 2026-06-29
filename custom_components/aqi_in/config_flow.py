@@ -61,7 +61,7 @@ async def _fetch_nearby_cities(
     ha_lat: float = hass.config.latitude or 20.0
     ha_lon: float = hass.config.longitude or 77.0
 
-    client = AQIClient()
+    client = await hass.async_add_executor_job(AQIClient)
     try:
         token = await client._get_token()
         resp = await client._http.get(
