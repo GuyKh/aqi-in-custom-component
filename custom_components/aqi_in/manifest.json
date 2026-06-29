@@ -4,8 +4,8 @@
   "codeowners": ["@guykh"],
   "config_flow": true,
   "documentation": "https://github.com/GuyKh/aqi-in-custom-component",
-  "issue_tracker": "https://github.com/GuyKh/aqi-in-custom-component/issues",
   "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/GuyKh/aqi-in-custom-component/issues",
   "requirements": ["aqi-in-api"],
   "version": "0.1.0"
 }
