@@ -5,7 +5,7 @@
   "requirements": ["aqi-in-api"],
   "codeowners": ["@guykh"],
   "issue_tracker": "https://github.com/GuyKh/aqi-in-custom-component/issues",
-  "license": "MIT",
   "version": "0.1.0",
-  "iot_class": "cloud_polling"
+  "iot_class": "cloud_polling",
+  "config_flow": true
 }

@@ -10,7 +10,7 @@ from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import config_validation as cv
 
-from . import AQIClient
+from aqi_in_api import AQIClient
 from .const import (
     CONF_COUNTRY,
     CONF_CITY,

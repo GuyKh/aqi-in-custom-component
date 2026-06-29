@@ -19,7 +19,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import (
-    AQI_BREAKPOINTS,
+    IAQI_BREAKPOINTS,
     DEFAULT_NAME,
     DOMAIN,
 )
@@ -137,10 +137,10 @@ class AQISensor(CoordinatorEntity, SensorEntity):
         if self.coordinator.data is None:
             return None
 
-        attrs = {}
+        attrs: dict[str, Any] = {}
         
         # Add AQI information if available
-        if self._sensor_type in AQI_BREAKPOINTS and self.coordinator.data.get(self._sensor_type) is not None:
+        if self._sensor_type in IAQI_BREAKPOINTS and self.coordinator.data.get(self._sensor_type) is not None:
             try:
                 value = float(self.coordinator.data.get(self._sensor_type, 0))
                 aqi = self._calculate_aqi(value, self._sensor_type)
@@ -157,10 +157,10 @@ class AQISensor(CoordinatorEntity, SensorEntity):
 
     def _calculate_aqi(self, value: float, pollutant: str) -> float:
         """Calculate AQI based on pollutant concentration."""
-        if pollutant not in AQI_BREAKPOINTS:
+        if pollutant not in IAQI_BREAKPOINTS:
             return 0.0
             
-        breakpoints = AQI_BREAKPOINTS[pollutant]
+        breakpoints = IAQI_BREAKPOINTS[pollutant]
         
         # Find the appropriate breakpoint range
         for bp_low, bp_high, aqi_low, aqi_high in breakpoints:
