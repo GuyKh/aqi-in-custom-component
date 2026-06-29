@@ -39,14 +39,14 @@ IAQI_SENSORS: dict[str, dict[str, Any]] = {
     "no2": {
         "name": "NO₂",
         "unit": CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
-        "device_class": SensorDeviceClass.NO2,
+        "device_class": SensorDeviceClass.NITROGEN_DIOXIDE,
         "state_class": SensorStateClass.MEASUREMENT,
         "iaqi_key": "no2",
     },
     "so2": {
         "name": "SO₂",
         "unit": CONCENTRATION_MICROGRAMS_PER_CUBIC_METER,
-        "device_class": SensorDeviceClass.SO2,
+        "device_class": SensorDeviceClass.SULPHUR_DIOXIDE,
         "state_class": SensorStateClass.MEASUREMENT,
         "iaqi_key": "so2",
     },
