@@ -1,11 +1,11 @@
 {
   "domain": "aqi_in",
   "name": "Air Quality India",
-  "documentation": "https://github.com/GuyKh/aqi-in-custom-component",
-  "requirements": ["aqi-in-api"],
   "codeowners": ["@guykh"],
+  "config_flow": true,
+  "documentation": "https://github.com/GuyKh/aqi-in-custom-component",
   "issue_tracker": "https://github.com/GuyKh/aqi-in-custom-component/issues",
-  "version": "0.1.0",
   "iot_class": "cloud_polling",
-  "config_flow": true
+  "requirements": ["aqi-in-api"],
+  "version": "0.1.0"
 }
