@@ -10,15 +10,16 @@
 [![BuyMeCoffee][buymecoffeebadge]][buymecoffee]
 [![Maintenance][maintenance-shield]][maintainer]
 
-This custom component provides access to air quality data from [AQI.in](https://aqicn.org/) for Home Assistant.
+This custom component provides access to air quality data from [AQI.in](https://www.aqi.in/) for Home Assistant.
 
 ## Features
 
 - Real-time air quality data from monitoring stations across India
-- Multiple pollutant sensors (PM2.5, PM10, NO2, SO2, CO, O3, NH3)
-- Indian Air Quality Index (IAQI) calculation
-- Configurable via UI with country/state/city selection
-- Support for multiple sensors per location
+- Air Quality Index (AQI) with Indian CPCB breakpoint calculation
+- Pollutant sensors: PM2.5, PM10, NO₂, SO₂, CO, O₃
+- Weather sensors: temperature, humidity, wind speed, pressure
+- Single-step config flow: auto-detects nearest city from Home Assistant coordinates
+- Each location added as a device with grouped sensors
 
 ## Installation
 
@@ -43,38 +44,41 @@ The integration can be configured via the Home Assistant UI:
 1. Go to Settings > Devices & Services
 2. Click "+ Add Integration"
 3. Search for "Air Quality India" and select it
-4. Follow the setup wizard to select your country, state, city, and sensors
+4. The nearest city is auto-selected based on your Home Assistant coordinates
+5. Choose your city from the dropdown and confirm
 
 ## Sensors
 
-The following sensors are available:
+### Air Quality Sensors
 
-- PM2.5 (Particulate Matter ≤ 2.5µm)
-- PM10 (Particulate Matter ≤ 10µm)
-- NO₂ (Nitrogen Dioxide)
-- SO₂ (Sulfur Dioxide)
-- CO (Carbon Monoxide)
-- O₃ (Ozone)
-- NH₃ (Ammonia)
+| Sensor | Description |
+|---|---|
+| **AQI** | Air Quality Index (CPCB breakpoints) |
+| **PM2.5** | Particulate Matter ≤ 2.5µm |
+| **PM10** | Particulate Matter ≤ 10µm |
+| **NO₂** | Nitrogen Dioxide |
+| **SO₂** | Sulfur Dioxide |
+| **CO** | Carbon Monoxide |
+| **O₃** | Ozone |
 
-Each sensor provides:
-- Current concentration value
-- Indian Air Quality Index (IAQI) in attributes
-- IAQI category (Good, Satisfactory, Moderately polluted, Poor, Very poor, Severe)
-- Timestamp of last update
-- Station name
+Each pollutant sensor provides the current concentration and the calculated IAQI (category and value) in its attributes.
+
+### Weather Sensors
+
+| Sensor | Description |
+|---|---|
+| **Temperature** | Current temperature (°C) |
+| **Humidity** | Relative humidity (%) |
+| **Wind Speed** | Wind speed (km/h) |
+| **Pressure** | Atmospheric pressure (hPa) |
 
 ## Data Source
 
-This integration uses the [AQI.in API](https://aqicn.org/api/) to provide air quality data. The data is updated every 10 minutes by default.
+This integration uses the [AQI.in API](https://www.aqi.in/) to provide air quality data. The data is updated every 10 minutes by default.
 
 ## Configuration Options
 
-In the configuration flow, you can select:
-- Country (defaults to India)
-- State/Province
-- City
-- Sensors to monitor (you can select multiple)
+The setup wizard auto-detects your nearest city from Home Assistant coordinates and presents a dropdown of the top 50 nearest cities. You can also reconfigure an existing entry to change the location.
 
 ## Node-RED Integration
 
