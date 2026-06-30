@@ -1,4 +1,7 @@
 {
   "name": "Air Quality India",
-  "render_readme": true
+  "filename": "aqi-in-custom-component.zip",
+  "hide_default_branch": true,
+  "render_readme": true,
+  "zip_release": true
 }
